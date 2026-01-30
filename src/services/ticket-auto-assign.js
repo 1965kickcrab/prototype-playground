@@ -1,4 +1,4 @@
-import { readStorageArray, writeStorageValue } from "./storage-utils.js";
+import { readStorageArray, writeStorageValue } from "../storage/storage-utils.js";
 
 const DAYCARE_RESERVATIONS_KEY = "daycare-reservations:reservations";
 const HOTELING_RESERVATIONS_KEY = "hoteling-reservations:reservations";
