@@ -1,4 +1,5 @@
 import { readStorageArray, writeStorageValue } from "../storage/storage-utils.js";
+import { recalculateTicketCounts } from "../services/ticket-count-service.js";
 
 const DAYCARE_RESERVATIONS_KEY = "daycare-reservations:reservations";
 const HOTELING_RESERVATIONS_KEY = "hoteling-reservations:reservations";
@@ -89,9 +90,10 @@ export function autoApplyIssuedTicketsToReservations(issues) {
       if (availableUses <= 0) continue;
 
       const ticketType = issuedTicket.type;
-
-      // Find the member's ticket entry to update its counts
       const memberTicket = member.tickets.find(t => t.id === issuedTicket.id);
+      if (!memberTicket) continue;
+
+      let assignedInThisRun = 0;
 
       for (const unassigned of unassignedDates) {
         if (availableUses <= 0) break;
@@ -108,22 +110,20 @@ export function autoApplyIssuedTicketsToReservations(issues) {
             // Apply the ticket
             unassigned.dateEntry.ticketUsage = {
                 ticketId: issuedTicket.id,
-                sequence: (memberTicket.usedCount || 0) + 1,
+                sequence: (memberTicket.usedCount || 0) + assignedInThisRun + 1,
             };
-
-            // Update counts
+            
+            assignedInThisRun++;
             availableUses--;
-            if(memberTicket) {
-                memberTicket.usedCount = (memberTicket.usedCount || 0) + 1;
-                memberTicket.reservableCount--;
-            }
         }
       }
     }
   }
 
-  // 7. Write all modified data back to storage
+  // 7. Write modified reservations back to storage
   writeStorageValue(DAYCARE_RESERVATIONS_KEY, daycareReservations);
   writeStorageValue(HOTELING_RESERVATIONS_KEY, hotelingReservations);
-  writeStorageValue(MEMBERS_KEY, members);
+  
+  // 8. Recalculate all counts based on the new state
+  recalculateTicketCounts();
 }
