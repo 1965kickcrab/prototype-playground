@@ -7,6 +7,7 @@ export const HOTELING_STATUS = Object.freeze({
   CHECKIN: "입실",
   CHECKOUT: "퇴실",
   CANCELED: "예약 취소",
+  NO_SHOW: '노쇼'
 });
 
 export const HOTELING_STATUS_OPTIONS = Object.freeze([
@@ -14,6 +15,7 @@ export const HOTELING_STATUS_OPTIONS = Object.freeze([
   HOTELING_STATUS.CHECKIN,
   HOTELING_STATUS.CHECKOUT,
   HOTELING_STATUS.CANCELED,
+  HOTELING_STATUS.NO_SHOW,
 ]);
 
 function buildDateRange(startKey, endKey) {

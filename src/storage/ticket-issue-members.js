@@ -1,5 +1,6 @@
 ﻿import { writeStorageValue } from "./storage-utils.js";
 import { autoApplyIssuedTicketsToReservations } from "../services/ticket-auto-assign.js";
+import { recalculateTicketCounts } from "../services/ticket-count-service.js";
 
 const STORAGE_KEY = "memberList";
 const SERVICE_TYPES = ["kindergarten", "daycare", "hoteling", "pickdrop"];
@@ -393,6 +394,7 @@ function normalizeTicketEntry(ticket) {
     issueDate: source.issueDate || source.issuedDate || "",
     startDate: source.startDate || "",
     usedCount: Number(source.usedCount) || 0,
+    reservedCount: Number(source.reservedCount) || 0,
     reservableCount,
     expiryDate: source.expiryDate || "",
     quantity: Number(source.quantity) || 0,
@@ -419,6 +421,7 @@ function appendIssuedTickets(item, issues) {
       issueDate: issue.issueDate ?? issue.issuedDate ?? "",
       startDate: issue.startDate ?? "",
       usedCount: Number(issue.usedCount) || 0,
+      reservedCount: 0,
       reservableCount: Number.isFinite(Number(issue.reservableCount))
         ? Number(issue.reservableCount)
         : Number.isFinite(Number(issue.totalCount))
@@ -540,6 +543,7 @@ export function applyReservationStatusChange(
   });
 
   writeStorageValue(STORAGE_KEY, next);
+  recalculateTicketCounts();
 }
 
 export function applyReservationToMember(memberId, useCount, type = "kindergarten") {
@@ -547,111 +551,11 @@ export function applyReservationToMember(memberId, useCount, type = "kindergarte
 }
 
 export function applyReservationToMemberTickets(memberId, usageMap) {
-  if (!memberId || !(usageMap instanceof Map) || usageMap.size === 0) {
-    return;
-  }
-  const list = readStorage();
-  if (!Array.isArray(list) || list.length === 0) {
-    return;
-  }
-
-  const next = list.map((item) => {
-    const member = normalizeMember(item);
-    if (String(member.id) !== String(memberId)) {
-      return item;
-    }
-    const currentTickets = Array.isArray(item.tickets) ? item.tickets : [];
-    const updatedTickets = currentTickets.map((ticket) => {
-      const ticketId = String(ticket?.id ?? "");
-      if (!ticketId || !usageMap.has(ticketId)) {
-        return ticket;
-      }
-      const usedAdd = Number(usageMap.get(ticketId)) || 0;
-      if (usedAdd <= 0) {
-        return ticket;
-      }
-      const usedCount = Number(ticket.usedCount) || 0;
-      const reservable = Number(ticket.reservableCount);
-      const total = Number(ticket.totalCount);
-      const totalLimit = Number.isFinite(total)
-        ? total
-        : Number.isFinite(reservable)
-          ? reservable + usedCount
-          : null;
-      const nextUsed = Number.isFinite(totalLimit)
-        ? Math.min(usedCount + usedAdd, totalLimit)
-        : usedCount + usedAdd;
-      const nextReservable = Number.isFinite(reservable)
-        ? Math.max(reservable - usedAdd, 0)
-        : Number.isFinite(totalLimit)
-          ? Math.max(totalLimit - nextUsed, 0)
-          : reservable;
-      return {
-        ...ticket,
-        usedCount: nextUsed,
-        reservableCount: Number.isFinite(nextReservable) ? nextReservable : reservable,
-      };
-    });
-    return { ...item, tickets: updatedTickets };
-  });
-
-  writeStorageValue(STORAGE_KEY, next);
+  recalculateTicketCounts();
 }
 
 export function rollbackReservationMemberTickets(memberId, usageMap) {
-  if (!memberId || !(usageMap instanceof Map) || usageMap.size === 0) {
-    return;
-  }
-  const list = readStorage();
-  if (!Array.isArray(list) || list.length === 0) {
-    return;
-  }
-
-  const next = list.map((item) => {
-    const member = normalizeMember(item);
-    if (String(member.id) !== String(memberId)) {
-      return item;
-    }
-    const currentTickets = Array.isArray(item.tickets) ? item.tickets : [];
-    const updatedTickets = currentTickets.map((ticket) => {
-      const ticketId = String(ticket?.id ?? "");
-      if (!ticketId || !usageMap.has(ticketId)) {
-        return ticket;
-      }
-      const usedSub = Number(usageMap.get(ticketId)) || 0;
-      if (usedSub <= 0) {
-        return ticket;
-      }
-      const usedCount = Number(ticket.usedCount) || 0;
-      const reservable = Number(ticket.reservableCount);
-      const total = Number(ticket.totalCount);
-      const totalLimit = Number.isFinite(total)
-        ? total
-        : Number.isFinite(reservable)
-          ? reservable + usedCount
-          : null;
-      const nextUsed = Math.max(usedCount - usedSub, 0);
-      let nextReservable = reservable;
-      if (Number.isFinite(totalLimit)) {
-        const maxReservable = Math.max(totalLimit - nextUsed, 0);
-        if (Number.isFinite(reservable)) {
-          nextReservable = Math.min(reservable + usedSub, maxReservable);
-        } else {
-          nextReservable = maxReservable;
-        }
-      } else if (Number.isFinite(reservable)) {
-        nextReservable = reservable + usedSub;
-      }
-      return {
-        ...ticket,
-        usedCount: nextUsed,
-        reservableCount: Number.isFinite(nextReservable) ? nextReservable : reservable,
-      };
-    });
-    return { ...item, tickets: updatedTickets };
-  });
-
-  writeStorageValue(STORAGE_KEY, next);
+  recalculateTicketCounts();
 }
 
 export function ensureMemberDefaults() {
