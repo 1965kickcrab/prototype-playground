@@ -1,0 +1,10 @@
+# VS Code
+.vscode/
+
+# Internal docs
+AGENTS.md
+GEMINI.md
+TODO.md
+
+# History folder
+history/
